@@ -37,7 +37,7 @@ class Server:
 			},
 			"room": {
 				"rooms": [
-					"!hxTlNqTYIXXcPFLgCy:danastas.io",
+					Settings.bridge_room,
 				],
 			},
 		}
