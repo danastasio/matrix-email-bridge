@@ -9,9 +9,6 @@ from settings import Settings
 from imapclient import IMAPClient
 
 class Server:
-	base_url = "https://matrix.danastas.io"
-	bridge_room = "!hxTlNqTYIXXcPFLgCy:danastas.io"
-	
 	def set_access_token(self: object) -> None:
 		payload = {
 			"type": "m.login.password",
