@@ -1,0 +1,9 @@
+secrets.py
+settings.py
+sync.json
+.*
+__pycache__/
+lib/
+lib64/
+test
+migrate.txt
