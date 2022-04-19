@@ -7,8 +7,8 @@ The purpose of this bridge is to send emails back and forth between matrix and a
 ## Installation
 
 ## Features
-- [ ] 50% email -> matrix
-- [ ] 00% matrix -> email
-- [ ] 00% Archiving emails
-- [ ] 00% Moving to another folder
-- [ ] 00% Deleting emails
+- [X] 100% email -> matrix
+- [ ] 000% matrix -> email
+- [ ] 000% Archiving emails
+- [ ] 000% Moving to another folder
+- [ ] 000% Deleting emails
