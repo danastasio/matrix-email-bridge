@@ -7,3 +7,7 @@ lib/
 lib64/
 test
 migrate.txt
+database.db
+bin/
+lib64
+pyvenv.cfg
