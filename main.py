@@ -1,12 +1,12 @@
-import requests
+import time
 import json
+import email
 import hashlib
 import sqlite3
-import time
+import requests
 from secrets import Secrets
 from settings import Settings
 from imapclient import IMAPClient
-import email
 
 class Server:
 	base_url = "https://matrix.danastas.io"
