@@ -70,10 +70,11 @@ class Server:
 		return json.loads(response.content.decode())['event_id']
 
 	def new_thread_reply(self: object, thread_id: str, last_event: str, body_text: str) -> str:
-		body_text = body_text
+		#body_text = body_text
 		payload = {
-			"org.matrix.msc1767.text": body_text,
 			"body": body_text,
+			"formatted_body": body_text,
+			"format": "org.matrix.custom.html",
 			"msgtype": "m.text",
 			"m.relates_to": {
 				"rel_type": "m.thread",
@@ -166,38 +167,45 @@ class Email:
 		self.bridged_reply: bool = False
 
 	@staticmethod
-	def refresh_inbox() -> list:
+	def login():
+		client = IMAPClient(host=Settings.imap_server)
+		client.login(Secrets.email_username, Secrets.email_password)
+		client.select_folder('INBOX')
+		client.idle()
+		return client
+
+	@staticmethod
+	def refresh_inbox(client: object) -> list:
 		email_list: list = []
-		with IMAPClient(host=Settings.imap_server) as client:
-			client.login(Secrets.email_username, Secrets.email_password)
-			client.select_folder('INBOX')
-			messages = client.search(['NOT', 'DELETED'])
-			for uid, message_data in client.fetch(messages, ["RFC822", "ENVELOPE"]).items():
-				body = None
-				email_message = email.message_from_bytes(message_data[b"RFC822"])
-				reply_emails = []
-				for sender in message_data[b'ENVELOPE'].reply_to:
-					reply_emails.append(f"{sender.mailbox.decode()}@{sender.host.decode()}")
-				current_email = Email(email_message.get("Message-ID"), message_data[b'ENVELOPE'].subject.decode(), email_message.get("In-Reply-To", '').strip(), email_message.get("From"), reply_emails)
-				if "Matrix-Bridged-Email" in email_message:
-					current_email.bridged_reply = True
-				if email_message.is_multipart():
-					for part in email_message.walk():
-						ctype = part.get_content_type()
-						cdispo = str(part.get('Content-Disposition'))
-					
-						# skip any text/plain (txt) attachments
-						if ctype == 'text/plain' and 'attachment' not in cdispo:
-							body = part.get_payload(decode=True)  # decode
-							break
-				# not multipart - i.e. plain text, no attachments, keeping fingers crossed
-				else:
-					body = email_message.get_payload(decode=True)
-				try:
-					current_email.body = body.decode()
-				except:
-					current_email.body = "General error"
-				email_list.append(current_email)
+		#messages = client.search(['NOT', 'DELETED'])
+
+		responses = client.idle_check(timeout=30)
+		print("Server sent:", responses if responses else "nothing")
+		for uid, message_data in client.idle_check(timeout=30): #client.fetch(messages, ["RFC822", "ENVELOPE"]).items():
+			body = None
+			email_message = email.message_from_bytes(message_data[b"RFC822"])
+			reply_emails = []
+			for sender in message_data[b'ENVELOPE'].reply_to:
+				reply_emails.append(f"{sender.mailbox.decode()}@{sender.host.decode()}")
+			current_email = Email(email_message.get("Message-ID"), message_data[b'ENVELOPE'].subject.decode(), email_message.get("In-Reply-To", '').strip(), email_message.get("From"), reply_emails)
+			if "Matrix-Bridged-Email" in email_message:
+				current_email.bridged_reply = True
+			if email_message.is_multipart():
+				for part in email_message.walk():
+					ctype = part.get_content_type()
+					cdispo = str(part.get('Content-Disposition'))
+					# skip any text/plain (txt) attachments
+					if ctype == 'text/plain' and 'attachment' not in cdispo:
+						body = part.get_payload(decode=True)  # decode
+						break
+			# not multipart - i.e. plain text, no attachments, keeping fingers crossed
+			else:
+				body = email_message.get_payload(decode=True)
+			try:
+				current_email.body = body.decode()
+			except:
+				current_email.body = "General error"
+			email_list.append(current_email)
 		return email_list
 
 	@staticmethod
@@ -209,14 +217,15 @@ class Email:
 		message['In-Reply-To'] = imap_id
 		message['References'] = imap_id
 		message['Matrix-Bridged-Email'] = "True"
-		message['Message-ID'] = utils.make_msgid(domain="davidanastasio.com")
+		message['Message-ID'] = utils.make_msgid(domain=Settings.email_domain)
 		text = "Please display this email as HTML"
 		part1 = MIMEText(text, 'plain')
 		part2 = MIMEText(body, 'html')
 		message.attach(part1)
 		message.attach(part2)
 		server = smtplib.SMTP(Settings.smtp_server, Settings.smtp_port)
-		server.starttls()
+		if Settings.use_starttls:
+			server.starttls()
 		server.login(Secrets.email_username, Secrets.email_password)
 		server.sendmail(Settings.email_address, to_addrs, message.as_string())
 		return message['Message-ID']
@@ -249,12 +258,13 @@ def main():
 	bridge.set_access_token()
 	print("Syncing...")
 	(prev_batch, sync_data, next_batch) = bridge.sync()
-	print("Sync done")
+	print("Sync done. Ready and listening for events")
+	client = Email.login()
+	print(client)
 
 	while True:
-		#time.sleep(Settings.sleep_time)
-		#time.sleep(10)
-		emails = Email.refresh_inbox()
+		print(f"Loop started.")
+		emails = Email.refresh_inbox(client)
 
 		for current_email in emails: 
 			# Find thread from DB based on in_reply_to header from email
@@ -295,12 +305,13 @@ def main():
 			(message.reply_to, message.imap_id) = db.find_original_message(message.thread_id)
 
 			if message.logged:
-				pass
+				continue
 			else:
 				# TODO Store subject in DB and fix
 				sent_message_id = Email.send("RE: Test email", message.reply_to, message.body, message.imap_id)
 				db.insert(sent_message_id, message.thread_id, message.event_id, message.reply_to)
 		next_batch = response['end']
+
 
 if __name__ == "__main__":
 	main()
