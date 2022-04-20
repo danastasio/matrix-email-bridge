@@ -1,16 +1,47 @@
+import os
 import time
 import json
 import email
 import smtplib
-import hashlib
 import sqlite3
 import requests
 from email import utils
-from secrets import Secrets
-from settings import Settings
+from config.secrets import Secrets
+from config.settings import Settings
 from imapclient import IMAPClient
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+class Setup:
+	def is_first_run() -> bool:
+		return not os.path.isfile('/app/config/settings.py')
+
+	def settings() -> None:
+		if not os.path.isfile('/app/config/settings.py'):
+			with open('/app/config/settings.py', 'w') as file:
+				file.write('''class Settings:
+	base_url:	str = "https://matrix.org"
+	bridge_room:	str = "!hxTlNqTYIXXcPFLgCy:matrix.org"
+	sleep_time:	int = 10
+	imap_server:	str = "imap.gmail.com"
+	imap_port:	str = "993"
+	smtp_server:	str = "smtp.gmail.com"
+	smtp_port:	str = "587"
+	use_starttls:	bool = True
+	email_address:	str = ""
+	email_domain:	str = "gmail.com"''')
+
+			with open('/app/config/__init__.py', 'w') as file:
+				pass
+
+	def secrets() -> None:
+		if not os.path.isfile('/app/config/secrets.py'):
+			with open('/app/config/secrets.py', 'w') as file:
+				file.write('''class Secrets:
+	matrix_password: str = ""
+	matrix_username: str = "" # localpart only, do not include @
+	email_username:  str = ""
+	email_password:  str = ""''')
 
 class Server:
 	def set_access_token(self: object) -> None:
@@ -84,7 +115,6 @@ class Server:
 				},
 			},
 		}
-		#url = f"{Settings.base_url}/_matrix/client/v3/rooms/{Settings.bridge_room}/send/m.room.message/3?access_token={self.token}"
 		url = f"{Settings.base_url}/_matrix/client/r0/rooms/{Settings.bridge_room}/send/m.room.message?access_token={self.token}"
 		response = requests.post(url, data=json.dumps(payload))
 		if json.loads(response.content.decode()).get('errcode') == "M_TOO_LARGE":
@@ -110,7 +140,8 @@ class Database:
 			imap_id TEXT NOT NULL UNIQUE,
 			thread_id TEXT NOT NULL,
 			event_id TEXT NOT NULL,
-			sender TEXT
+			sender TEXT,
+			subject TEXT
 		)'''
 		conn.execute(table)
 
@@ -133,12 +164,13 @@ class Database:
 
 	def find_original_message(self: object, thread_id: str) -> str:
 		cursor = self.conn.cursor()
-		cursor.execute(f"SELECT sender, imap_id FROM email_matrix WHERE event_id=? ORDER BY id LIMIT 1", (thread_id,))
+		cursor.execute(f"SELECT sender, imap_id, subject FROM email_matrix WHERE event_id=? ORDER BY id LIMIT 1", (thread_id,))
 		results = cursor.fetchall()
 		for row in results:
 			sender = row[0]
 			in_reply_to = row[1]
-		return (sender, in_reply_to)
+			subject = row[2]
+		return (sender, in_reply_to, subject)
 
 	def email_already_logged(self: object, imap_id: str) -> bool:
 		cursor = self.conn.cursor()
@@ -185,9 +217,8 @@ class Email:
 					for part in email_message.walk():
 						ctype = part.get_content_type()
 						cdispo = str(part.get('Content-Disposition'))
-					
 						# skip any text/plain (txt) attachments
-						if ctype == 'text/plain' and 'attachment' not in cdispo:
+						if ctype == 'text/text' and 'attachment' not in cdispo:
 							body = part.get_payload(decode=True)  # decode
 							break
 				# not multipart - i.e. plain text, no attachments, keeping fingers crossed
@@ -231,6 +262,7 @@ class Message:
 		self.event_id = event_id
 		self.thread_id = thread_id
 		self.logged = False
+		self.subject = ''
 
 	@property
 	def reply_to(self: object):
@@ -241,6 +273,12 @@ class Message:
 		self._reply_to = json.loads(addresses)
 
 def main():
+	if Setup.is_first_run():
+		print("Running setup tasks...")
+		Setup.settings()
+		Setup.secrets()
+		print("Setup complete. Please configure settings.py and secrets.py")
+		quit()
 	print("Connecting bridge")
 	bridge = Server()
 	print("Connecting database")
@@ -252,8 +290,9 @@ def main():
 	print("Sync done")
 
 	while True:
-		#time.sleep(Settings.sleep_time)
-		#time.sleep(10)
+		print("Starting loop again")
+		print(f"Sleeing for {Settings.sleep_time}")
+		time.sleep(Settings.sleep_time)
 		emails = Email.refresh_inbox()
 
 		for current_email in emails: 
@@ -267,6 +306,7 @@ def main():
 				if current_email.bridged_reply:
 					# Skip replies that we send from Matrix
 					continue
+				print("New email reply detected")
 				err_code = bridge.new_thread_reply(thread_id, last_event, current_email.body)
 				if err_code == "event too large":
 					bridge.new_thread_reply(thread_id, last_event, "Event too large. View in a different application.")
@@ -276,6 +316,7 @@ def main():
 				if current_email.bridged_reply:
 					# Skip replies that we send from Matrix
 					continue
+				print("New email detected")
 				thread_id = bridge.new_message(current_email.subject, current_email.sender)
 				last_event = bridge.new_thread_reply(thread_id, last_event, str(current_email.body))
 				if last_event == "event too large":
@@ -292,13 +333,14 @@ def main():
 
 			# If event_id from response is not in DB, assume new message and send the body along
 			message.logged = db.message_already_logged(message.event_id)
-			(message.reply_to, message.imap_id) = db.find_original_message(message.thread_id)
+			(message.reply_to, message.imap_id, message.subject) = db.find_original_message(message.thread_id)
 
 			if message.logged:
 				pass
 			else:
 				# TODO Store subject in DB and fix
-				sent_message_id = Email.send("RE: Test email", message.reply_to, message.body, message.imap_id)
+				print("Matrix reply detected - sending email")
+				sent_message_id = Email.send(message.subject, message.reply_to, message.body, message.imap_id)
 				db.insert(sent_message_id, message.thread_id, message.event_id, message.reply_to)
 		next_batch = response['end']
 
