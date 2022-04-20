@@ -8,8 +8,10 @@ The purpose of this bridge is to send emails back and forth between matrix and a
 
 ## Features
 - [X] 100% email -> matrix
-- [ ] 000% matrix -> email
+- [X] 100% matrix -> email
 - [ ] Attachments
+- [ ] HTML Formatting
 - [ ] 000% Archiving emails
 - [ ] 000% Moving to another folder
 - [ ] 000% Deleting emails
+- [ ] Support for an encrypted room (long term goal)
