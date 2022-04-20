@@ -9,6 +9,7 @@ The purpose of this bridge is to send emails back and forth between matrix and a
 ## Features
 - [X] 100% email -> matrix
 - [ ] 000% matrix -> email
+- [ ] Attachments
 - [ ] 000% Archiving emails
 - [ ] 000% Moving to another folder
 - [ ] 000% Deleting emails
