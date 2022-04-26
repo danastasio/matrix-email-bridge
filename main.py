@@ -182,7 +182,7 @@ class Database:
 
 	def find_original_message(self: object, thread_id: str) -> str:
 		cursor = self.conn.cursor()
-		cursor.execute(f"SELECT sender, imap_id, subject FROM email_matrix WHERE event_id=? ORDER BY id LIMIT 1", (thread_id,))
+		cursor.execute(f"SELECT sender, imap_id, subject FROM email_matrix WHERE thread_id=? ORDER BY id LIMIT 1", (thread_id,))
 		results = cursor.fetchall()
 		for row in results:
 			sender = row[0]
@@ -309,7 +309,7 @@ def main():
 				last_event = bridge.new_thread_reply(thread_id, last_event, str(current_email.body))
 				if last_event == "event too large":
 					bridge.new_thread_reply(thread_id, last_event, "Event too large. View in a different application.")
-				db.insert(current_email.imap_id, thread_id, thread_id, current_email.from_, current_email.subject)
+				db.insert(current_email.imap_id, thread_id, last_event, current_email.from_, current_email.subject)
 
 		# Check for new messages in element that need to be sent to email
 		response = bridge.get_messages(next_batch)
@@ -321,12 +321,12 @@ def main():
 
 			# If event_id from response is not in DB, assume new message and send the body along
 			message.logged = db.message_already_logged(message.event_id)
-			(message.from_, message.imap_id, message.subject) = db.find_original_message(message.thread_id)
-
+		
 			if message.logged:
 				pass
 			else:
 				print("Matrix reply detected - sending email")
+				(message.from_, message.imap_id, message.subject) = db.find_original_message(message.thread_id)
 				sent_message_id = Email.send(message.subject, message.from_, message.body, message.imap_id)
 				db.insert(sent_message_id, message.thread_id, message.event_id, message.from_, message.subject)
 		next_batch = response['end']
