@@ -232,7 +232,7 @@ class Email:
 		message = MIMEMultipart('alternative')
 		message['Subject'] = subject
 		message['From'] = Settings.email_address
-		message['To'] = f"{ ','.join(list(to_addrs)) }"
+		message['To'] = to_addrs
 		message['In-Reply-To'] = imap_id
 		message['References'] = imap_id
 		message['Matrix-Bridged-Email'] = "True"
