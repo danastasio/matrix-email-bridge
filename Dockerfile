@@ -16,10 +16,12 @@
 FROM registry.fedoraproject.org/fedora-minimal
 
 RUN microdnf install -y python3 python3-pip
-RUN pip install imapclient requests
+RUN pip install imap_tools requests
 
 WORKDIR /app
 COPY . /app
-RUN mkdir /app/config
+RUN rm /app/config/settings.py
+RUN rm /app/config/secrets.py
+RUN rm /app/config/database.db
 VOLUME /app/config
 CMD /usr/bin/python3 /app/main.py
