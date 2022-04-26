@@ -11,3 +11,5 @@ database.db
 bin/
 lib64
 pyvenv.cfg
+messages.json
+tests.py
