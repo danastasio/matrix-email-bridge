@@ -118,8 +118,9 @@ class Server:
 	def new_thread_reply(self: object, thread_id: str, last_event: str, body_text: str) -> str:
 		body_text = body_text
 		payload = {
-			"org.matrix.msc1767.text": body_text,
 			"body": body_text,
+			"format": "org.matrix.custom.html",
+			"formatted_body": body_text,
 			"msgtype": "m.text",
 			"m.relates_to": {
 				"rel_type": "m.thread",
@@ -139,6 +140,9 @@ class Server:
 				return json.loads(response.content.decode())['event_id']
 			except KeyError:
 				print(f"New thread reply failed. Server response was: {json.loads(response.content.decode())}")
+
+	def send_attachment(self: object):
+		pass
 
 	def thread_endpoint(self: object):
 		'''
@@ -225,6 +229,13 @@ class Email:
 				except (IndexError, TypeError):
 					current_email = Email(message.headers.get("message-id")[0], message.subject, None, message.from_, message.text or message.html or "Empty body")
 				email_list.append(current_email)
+
+				# Try and get attachments
+				for attachment in message.attachments:
+					if attachment.content_disposition != "inline":
+						print("attachments detected")
+						print(attachment.payload)
+						print(f"Mimetype: {message.content_type}\nSize: {message.size}")
 		return email_list
 
 	@staticmethod
@@ -232,7 +243,7 @@ class Email:
 		message = MIMEMultipart('alternative')
 		message['Subject'] = subject
 		message['From'] = Settings.email_address
-		message['To'] = f"{ ','.join(list(to_addrs)) }"
+		message['To'] = to_addrs
 		message['In-Reply-To'] = imap_id
 		message['References'] = imap_id
 		message['Matrix-Bridged-Email'] = "True"
