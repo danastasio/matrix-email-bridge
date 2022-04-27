@@ -14,8 +14,8 @@ from email.mime.multipart import MIMEMultipart
 try:
 	from config.secrets import Secrets
 	from config.settings import Settings
-except:
-	print("Missing config files. Trying to continue...")
+except Exception as e:
+	print("Missing config files. Trying to continue...", f"Given error was {e}")
 
 class Setup:
 	def is_first_run() -> bool:
