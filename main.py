@@ -56,12 +56,12 @@ class Server:
 			"password": Secrets.matrix_password,
 		}
 		url = f"{Settings.base_url}/_matrix/client/r0/login"
-		response = requests.post(url, data=json.dumps(payload))
-		response = json.loads(response.content.decode())
 		try:
+			response = requests.post(url, data=json.dumps(payload))
+			response = json.loads(response.content.decode())
 			self.token = response['access_token']
-		except KeyError:
-			print(f"Not logged in. Response from server was: {response}")
+		except KeyError as e:
+			print(f"Not logged in. Response from server was: {response}", f"Error thrown was {e}")
 			quit()
 
 	def sync(self: object) -> tuple:
