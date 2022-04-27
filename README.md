@@ -7,15 +7,10 @@ By far, the easiest way to run this bridge is to use the docker image. I use pod
  
 1. Create a new room in Matrix using your favorite client
 2. Copy the room id (instructions vary by client)
-3. Download the bridge ```git clone git@github.com:danastasio/matrix-email-bridge```
-4. Change to the downloaded directory ```cd matrix-email-bridge```
-5. Build the image ```podman build -t matrix-email-bridge .```
-6. Create a volume directory ```mkdir $HOME/matrix-email-bridge```
-7. Run the bridge ```podman run -it --rm -v $HOME/matrix-email-bridge:/app/config:Z --name matrix-email-bridge localhost/matrix-email-bridge:latest```
-8. The bridge will run and create the config files the first time it is run. Fill out $HOME/matrix-email-bridge/settings.py and $HOME/matrix-email-bridge/secrets.py
-9. Run the bridge again. It will stay running this time.
-
-An image on docker hub will be published eventually.
+3. Create a volume directory ```mkdir $HOME/matrix-email-bridge```
+4. Download and run the bridge ```podman run -it --rm -v $HOME/matrix-email-bridge:/app/config:Z --name matrix-email-bridge docker.io/danastasio/matrix-email-bridge:stable```
+5. The bridge will run and create the config files the first time it is run. Fill out $HOME/matrix-email-bridge/settings.py and $HOME/matrix-email-bridge/secrets.py
+6. Run the bridge again (change -it to -dt if you don't want the output). It will stay running this time.
 
 ## Installation
 
