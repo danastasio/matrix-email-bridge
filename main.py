@@ -21,10 +21,35 @@ class Setup:
 	def is_first_run() -> bool:
 		return not os.path.isfile('/app/config/settings.py')
 
+	def sanity_checks() -> (bool, str):
+		'''
+		Check settings to make sure they are valid before running bridge
+		'''
+		response = requests.get(f"{Settings.base_url}/_matrix/federation/v1/version")
+		if not response.ok:
+			return (True, "Invalid base_url. Server response was: {response.content}")
+
+		if Settings.base_url[-1:] == '/':
+			return (True, "Invalid base_url. Remove trailing / from url")
+
+		if "!" not in Settings.bridge_room or ":" not in Settings.bridge_room:
+			return (True, "Invalid bridge room. Must be full ID including '!' and the server (e.g. matrix.org)")
+
+		if "@" in Secrets.matrix_username:
+			return (True, "Invalid matrix username. Do not include @ in localpart")
+
+		if ":" in Secrets.matrix_username:
+			return (True, "Invalid matrix username. Include only the localpart. Do not include server")
+
+		if not Secrets.matrix_username or not Secrets.matrix_password or not Secrets.email_username or not Secrets.email_password:
+			return (True, "Missing login information. Check $HOME/matrix-email-bridge/secrets.py is properly filled out")
+
+		return (False, "")
 	def settings() -> None:
 		if not os.path.isfile('/app/config/settings.py'):
 			with open('/app/config/settings.py', 'w') as file:
 				file.write('''class Settings:
+	db_build_only: bool = True
 	base_url:	str = "https://matrix.org"
 	bridge_room:	str = "!hxTlNqTYIXXcPFLgCy:matrix.org"
 	sleep_time:	int = 10
@@ -47,6 +72,10 @@ class Setup:
 	matrix_username: str = "" # localpart only, do not include @
 	email_username:  str = ""
 	email_password:  str = ""''')
+
+	def database() -> None:
+		with open('/app/config/database.db', 'w') as file:
+			pass
 
 class Server:
 	def set_access_token(self: object) -> None:
@@ -268,6 +297,15 @@ def main():
 		Setup.secrets()
 		print("Setup complete. Please configure settings.py and secrets.py")
 		quit()
+
+	print("Running sanity checks...")
+	(check_status, error_message) = Setup.sanity_checks()
+	if check_status:
+		print(f"Problems detected with settings during startup. Error message is: {error_message}")
+		print("Stopping bridge - service not possible")
+		quit()
+		
+	print("Sanity checks passed")
 	print(f"DB Build mode: {Settings.db_build_only}")
 	print("Connecting bridge")
 	bridge = Server()
