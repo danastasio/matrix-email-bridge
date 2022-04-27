@@ -25,6 +25,7 @@ class Setup:
 		if not os.path.isfile('/app/config/settings.py'):
 			with open('/app/config/settings.py', 'w') as file:
 				file.write('''class Settings:
+	db_build_only: bool = True
 	base_url:	str = "https://matrix.org"
 	bridge_room:	str = "!hxTlNqTYIXXcPFLgCy:matrix.org"
 	sleep_time:	int = 10
@@ -47,6 +48,10 @@ class Setup:
 	matrix_username: str = "" # localpart only, do not include @
 	email_username:  str = ""
 	email_password:  str = ""''')
+
+	def database() -> None:
+		with open('/app/config/database.db', 'w') as file:
+			pass
 
 class Server:
 	def set_access_token(self: object) -> None:
